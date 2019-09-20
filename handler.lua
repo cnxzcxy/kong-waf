@@ -146,13 +146,14 @@ local function waf_ua_check( ... )
   local ua = ngx.var.http_user_agent
   if ua ~= nil then
     for _,rule in pairs(uarules) do
-      if ~= "" and ngxmatch(ua,rule,"isjo") then
+      if rule ~= "" and ngxmatch(ua,rule,"isjo") then
         ngx.log(ngx.ERR, "waf ua check failed")
         ngx.log(ngx.ERR, rule)
         ngx.log(ngx.ERR, ua)
         return true
       end
     end
+  end
   return false
 end
 
