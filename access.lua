@@ -1,3 +1,4 @@
+  
 local ngx = ngx
 local kong = kong
 local pairs = pairs
@@ -73,8 +74,8 @@ local function waf_log_write(logfile,msg)
 end
 
 local function waf_log(method, url, data, ruletag)
-	-- body
-	if attacklog then
+    -- body
+    if attacklog then
     local realIp = ngx.var.binary_remote_addr
     local ua = ngx.var.http_user_agent
     local servername=ngx.var.server_name
@@ -109,8 +110,8 @@ end
 
 
 local function waf_get_boundary( ... )
-	-- body
-	local header = headers["content-type"]
+    -- body
+    local header = headers["content-type"]
     if not header then
         return nil
     end
@@ -144,7 +145,7 @@ end
 
 -- 定义waf插件user-agent检测函数
 local function waf_ua_check( ... )
-	-- body
+    -- body
   local ua = ngx.var.http_user_agent
   if ua ~= nil then
     for _,rule in pairs(uarules) do
@@ -160,8 +161,8 @@ end
 
 -- 定义waf插件get参数检测函数
 local function waf_args_check( ... )
-	-- body
-	for _,rule in pairs(argsrules) do
+    -- body
+    for _,rule in pairs(argsrules) do
     local args = kong.request.get_query()
     for key, val in pairs(args) do
       kong.log.err(key)
@@ -191,9 +192,9 @@ end
 
 -- 定义waf插件cookie参数检测函数
 local function waf_cookie_check( cookie_check )
-	-- body
+    -- body
   local var = ngx.var
-	local ck = var.http_cookie
+    local ck = var.http_cookie
   if optionIsOn(cookie_check) and ck then
     for _,rule in pairs(ckrules) do
       tb_rules = split_waf_rule(rule, '@@@')
@@ -207,12 +208,12 @@ local function waf_cookie_check( cookie_check )
 end
 
 local function waf_body_check( data )
-	-- body
-	for _,rule in pairs(postrules) do
-		tb_rules = split_waf_rule(rule, '@@@')
-		if rule ~= "" and data ~= "" and ngx.re.match(ngx.unescape_uri(data),tb_rules[2],"isjo") then
-			waf_log( 'POST', ngx.var.request_uri, data, tb_rules[1] )
-			return true
+    -- body
+    for _,rule in pairs(postrules) do
+        tb_rules = split_waf_rule(rule, '@@@')
+        if rule ~= "" and data ~= "" and ngx.re.match(ngx.unescape_uri(data),tb_rules[2],"isjo") then
+            waf_log( 'POST', ngx.var.request_uri, data, tb_rules[1] )
+            return true
     end
   end
   return false
@@ -242,8 +243,8 @@ end
 
 -- 定义waf检测入口函数
 local function waf( conf )
-	-- body
-	if ngx.var.http_Acunetix_Aspect then
+    -- body
+    if ngx.var.http_Acunetix_Aspect then
     ngx.exit(444)
   elseif ngx.var.http_X_Scan_Memo then
     ngx.exit(444)

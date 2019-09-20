@@ -29,11 +29,11 @@ local open = io.open
 
 local headers = {}
 -- 定义waf规则变量
-local uarules = nil
-local ckrules = nil
-local urlrules = nil
-local argsrules = nil
-local postrules = nil
+local uarules = {}
+local ckrules = {}
+local urlrules = {}
+local argsrules = {}
+local postrules = {}
 local rules_array = {}
 
 local logpath = nil
@@ -82,20 +82,19 @@ end
 local optionIsOn = function (options) return options == "on" and true or false end
 
 local function read_waf_rule(var)
+  ngx.log(ngx.ERR, "============ waf read conf! ============")
+  ngx.log(ngx.ERR, var)
   local file = open('/usr/local/share/lua/5.1/kong/plugins/kong-waf/wafconf/'..var,"r")
   if file==nil then
     return
   end
-  local i = 1
-  local nFindLastIndex = nil
+  local t = {}
   for line in file:lines() do
-    nFindLastIndex = sfind(line, "@@@", 1)
-    if nFindLastIndex then
-      rules_array[i] = {ssub(line, 1, nFindLastIndex - 1), ssub(line, nFindLastIndex + 3, slen(line))}
-      i = i + 1
-    end
+    ngx.log(ngx.ERR, line)
+    table.insert(t, line)
   end
   file:close()
+  return(t)
 end
 
 -- waf插件相关函数
@@ -108,8 +107,8 @@ local function waf_log_write( logfile, msg )
 end
 
 local function kong_log(pos, ruletag)
-	-- body
-	if attacklog then
+    -- body
+    if attacklog then
     local ua = ngx.var.http_user_agent
     local servername = ngx.var.server_name
     local host = ngx.var.host
@@ -131,32 +130,36 @@ end
 
 -- 定义waf插件url检测函数
 local function waf_url_check( ... )
-  if ngxmatch(uri,rules_array[1][2],"isjo") then
-    waf_log('uri', rules_array[i][1])
-    return true
+  for _,rule in pairs(urlrules) do
+    if uri ~= "" and ngxmatch(uri,rule,"isjo") then
+      ngx.log(ngx.ERR, "waf url check failed")
+      ngx.log(ngx.ERR, rule)
+      ngx.log(ngx.ERR, uri)
+      return true
+    end
   end
   return false
 end
 
 -- 定义waf插件user-agent检测函数
 local function waf_ua_check( ... )
-	-- body
   local ua = ngx.var.http_user_agent
   if ua ~= nil then
-    for i = 2, #rules_array do
-      if ngxmatch(ua,rules_array[i][2],"isjo") then
-        kong_log('User-Agent', rules_array[i][1])
+    for _,rule in pairs(uarules) do
+      if ~= "" and ngxmatch(ua,rule,"isjo") then
+        ngx.log(ngx.ERR, "waf ua check failed")
+        ngx.log(ngx.ERR, rule)
+        ngx.log(ngx.ERR, ua)
         return true
       end
     end
-  end
   return false
 end
 
 -- 定义waf插件get参数检测函数
 local function waf_args_check( ... )
-  -- body
-  for i = 2, #rules_array do
+  for _,rule in pairs(argsrules) do
+    -- local args = ngx.req.get_uri_args()
     local args = request.get_query()
     for key, val in pairs(args) do
       if type(val)=='table' then
@@ -167,12 +170,14 @@ local function waf_args_check( ... )
           end
           table.insert(t,v)
         end
-        data=table.concat(t, " ")        
+        data=table.concat(t, " ")
       else
         data=val
       end
-      if data and type(data) ~= "boolean" and ngxmatch(ngx.unescape_uri(data),rules_array[i][2],"isjo") then
-        kong_log('args', rules_array[i][1])
+      if data and type(data) ~= "boolean" and rule ~="" and ngxmatch(unescape(data),rule,"isjo") then
+        ngx.log(ngx.ERR, "waf args check failed")
+        ngx.log(ngx.ERR, rule)
+        ngx.log(ngx.ERR, data)
         return true
       end
     end
@@ -182,24 +187,25 @@ end
 
 -- 定义waf插件cookie参数检测函数
 local function waf_cookie_check( ... )
-	local ck = request.get_header('Cookie')
-  if ck then
-    for i = 2, #rules_array do
-      if ngxmatch(ck,rules_array[i][2],"isjo") then
-        kong_log('cookie', rules_array[i][1])
-        return true
-      end
+  local ck = request.get_header('Cookie')
+  for _,rule in pairs(ckrules) do
+    if uri ~= "" and ngxmatch(ck,rule,"isjo") then
+      ngx.log(ngx.ERR, "waf cookie check failed")
+      ngx.log(ngx.ERR, rule)
+      ngx.log(ngx.ERR, ck)
+      return true
     end
   end
   return false
 end
 
 local function waf_body_check( data )
-	-- body
-	for i = 2, #rules_array do
-		if data ~= "" and ngxmatch(ngx.unescape_uri(data),rules_array[i][2],"isjo") then
-			kong_log( 'body', rules_array[i][1] )
-			return true
+  for _,rule in pairs(postrules) do
+    if data ~= "" and ngxmatch(data,rule,"isjo") then
+      ngx.log(ngx.ERR, "waf body check failed")
+      ngx.log(ngx.ERR, rule)
+      ngx.log(ngx.ERR, data)
+      return true
     end
   end
   return false
@@ -207,7 +213,6 @@ end
 
 -- 定义waf插件post请求检测函数
 local function waf_post_check( ... )
-  -- body
   local post_status = nil
   local content_length = tonumber(headers['content-length'])
   local method = request.get_method()
@@ -230,8 +235,7 @@ end
 
 -- 定义waf检测入口函数
 local function waf( conf )
-	-- body
-	if ngx.var.http_Acunetix_Aspect then
+  if ngx.var.http_Acunetix_Aspect then
     ngx.exit(444)
   elseif ngx.var.http_X_Scan_Memo then
     ngx.exit(444)
@@ -262,7 +266,11 @@ function KongWaf:init_worker()
   if not ok then
     kong.log.err("could not enable lrucache: ", err)
   end
-  read_waf_rule('args')
+  uarules = read_waf_rule('user-agent')
+  ckrules = read_waf_rule('cookie')
+  urlrules = read_waf_rule('url')
+  argsrules = read_waf_rule('args')
+  postrules = read_waf_rule('post')
 end
 
 -- 构造插件访问逻辑, 判断黑白名单, WAF判断在这里实现
@@ -270,6 +278,11 @@ function KongWaf:access(conf)
   KongWaf.super.access(self)
   local block = false
   binary_remote_addr = ngx.var.binary_remote_addr-- 获取客户端真实IP地址
+
+  if conf.say_hello then
+    ngx.log(ngx.ERR, "============ Hello World! ============")
+    ngx.header["KongWaf"] = "Hello"
+  end
 
   if not binary_remote_addr then
     return kong.response.exit(FORBIDDEN, { message = "Cannot identify the client IP address, unix domain sockets are not supported." })
@@ -298,5 +311,4 @@ function KongWaf:access(conf)
     end
   end
 end
-
 return KongWaf
